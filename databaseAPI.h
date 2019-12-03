@@ -1,7 +1,9 @@
 #include <sstream>
 #include <time.h>
-#include <stdio.h> 
+#include <stdio.h>
+#include <unistd.h>
 #include <stdlib.h> 
+#include <pthread.h> 
 #include <pqxx/pqxx>
 using namespace std;
 using namespace pqxx;
@@ -44,8 +46,12 @@ void add_session(pqxx::transaction_base &txn, std::string sessionId, int pageSeq
 
 void generateRandomData(std::string &sessionId, int &pageSeq, string &cacheId, string &eventId, int &timeStamp)
 {
-    srand(time(0));
-    int randomNum = rand();
+
+    struct timespec start;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
+    //srand(start.tv_nsec);
+    long randomNum = start.tv_nsec;
 
     //randomNum = randomNum%100000;
 
@@ -63,7 +69,31 @@ void generateRandomData(std::string &sessionId, int &pageSeq, string &cacheId, s
     eventId.append(oss.str());
 
     timeStamp = time(0);
+}
 
+void *workerThreadInsert(void *arg)
+{
+    cout << "worker thread " << (long)arg << endl;
+    pqxx::connection C("dbname=sessiondatabase user=kapil");
+    std::cout << "Connected to " << C.dbname() << std::endl;
+    //pqxx:: work txn{C};
+    
+    int count = 0;
+    while(count < 50)
+    {
+        std::string sessionId;
+        int pageSeq;
+        std::string cacheId;
+        std::string eventId;
+        int time;
 
+        generateRandomData(sessionId,pageSeq,cacheId,eventId,time);
+        pqxx:: work txn{C};
+        add_session(txn,sessionId,pageSeq,cacheId,eventId,/*time*/(long)arg);
+        txn.commit();
+
+        sleep(5);
+        count++;
+    }
 }
 
