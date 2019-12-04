@@ -75,7 +75,7 @@ void read_session(pqxx::transaction_base &txn, std::string sessionId, int pageSe
 void generateRandomData(std::string &sessionId, int &pageSeq, string &cacheId, string &eventId, int &timeStamp)
 {
     long int ns;
-    uint64_t all;
+    //uint64_t all;
     time_t sec;
     struct timespec spec;
 
@@ -123,35 +123,34 @@ void *workerThreadInsert(void *arg)
         add_session(txn,sessionId,pageSeq,cacheId,eventId,/*time*/(long)arg);
         txn.commit();
 
-        sleep(5);
+        /*sleep for 1/10 (100000 us) of second*/
+        usleep(100000);
         count++;
     }
+    return NULL;
 }
 
 void *workerThreadRead(void *arg)
 {
-    //cout << "\nworker thread reader number :" << (long)arg << endl;
     pqxx::connection C("dbname=sessiondatabase user=kapil");
-    //std::cout << "Connected to " << C.dbname() << std::endl;
-    //pqxx:: work txn{C};
-    
+
     int count = 0;
     while(count < 50)
     {
         cout << "\n\n\nworker thread read by thread : " << (long)arg << endl;
         std::string sessionId;
-        int pageSeq;
+        int pageSeq = 0;
         std::string cacheId;
         std::string eventId;
-        int time;
-
-        //generateRandomData(sessionId,pageSeq,cacheId,eventId,time);
+        
         pqxx:: work txn{C};
         read_session(txn,sessionId,pageSeq,cacheId,eventId,/*time*/(long)arg);
         txn.commit();
 
-        sleep(5);
+        /*sleep for 1/10 (100000 us) of second*/
+        usleep(100000);
         count++;
     }
+    return NULL;
 }
 
