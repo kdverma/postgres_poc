@@ -35,11 +35,22 @@ int main()
         // generateRandomData(sessionId,pageSeq,cacheId,eventId,time);
         //cout << sessionId << "\t" << pageSeq <<"\t\t" << cacheId << "\t" << eventId << "\t" << time << endl;
         pthread_t my_thread[5];
+        pthread_t my_thread_reader[5];
         void *ret_join;
         long id;
         for(id = 1; id <= 5; id++) 
         {
             int ret =  pthread_create(&my_thread[id], NULL, &workerThreadInsert, (void*)id);
+            if(ret != 0) 
+            {
+                printf("Error: pthread_create() failed\n");
+                exit(EXIT_FAILURE);
+            }
+        }
+
+        for(id = 1; id <= 5; id++) 
+        {
+            int ret =  pthread_create(&my_thread_reader[id], NULL, &workerThreadRead, (void*)id);
             if(ret != 0) 
             {
                 printf("Error: pthread_create() failed\n");
@@ -53,10 +64,22 @@ int main()
             int ret = pthread_join(my_thread[id], &ret_join);
             if(ret != 0) 
             {
-                perror("pthread_join failed");
+                perror("pthread_join failed writter thread");
                 exit(EXIT_FAILURE);
             }
-            printf("Thread joined, it returned %s\n", (char *) ret_join);
+            printf("Thread joined for writter, it returned %s\n", (char *) ret_join);
+            //exit(EXIT_SUCCESS);
+        }
+
+        for(id = 1; id <= 5; id++) 
+        {
+            int ret = pthread_join(my_thread_reader[id], &ret_join);
+            if(ret != 0) 
+            {
+                perror("pthread_join failed for reader threads");
+                exit(EXIT_FAILURE);
+            }
+            printf("Thread joined for reader, it returned %s\n", (char *) ret_join);
             //exit(EXIT_SUCCESS);
         }
     }
