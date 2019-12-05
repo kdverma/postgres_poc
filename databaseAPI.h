@@ -1,4 +1,5 @@
 #include <sstream>
+#include <thread>
 #include <time.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -102,9 +103,9 @@ void generateRandomData(std::string &sessionId, int &pageSeq, string &cacheId, s
     timeStamp = time(0);
 }
 
-void *workerThreadInsert(void *arg)
+void workerThreadInsert(int arg)
 {
-    cout << "worker thread " << (long)arg << endl;
+    cout << "worker thread " << arg << endl;
     pqxx::connection C("dbname=sessiondatabase user=kapil");
     std::cout << "Connected to " << C.dbname() << std::endl;
     //pqxx:: work txn{C};
@@ -120,37 +121,35 @@ void *workerThreadInsert(void *arg)
 
         generateRandomData(sessionId,pageSeq,cacheId,eventId,time);
         pqxx:: work txn{C};
-        add_session(txn,sessionId,pageSeq,cacheId,eventId,/*time*/(long)arg);
+        add_session(txn,sessionId,pageSeq,cacheId,eventId,/*time*/arg);
         txn.commit();
 
         /*sleep for 1/10 (100000 us) of second*/
         usleep(100000);
         count++;
     }
-    return NULL;
 }
 
-void *workerThreadRead(void *arg)
+void workerThreadRead(int arg)
 {
     pqxx::connection C("dbname=sessiondatabase user=kapil");
 
     int count = 0;
     while(count < 50)
     {
-        cout << "\n\n\nworker thread read by thread : " << (long)arg << endl;
+        cout << "\n\n\nworker thread read by thread : " << arg << endl;
         std::string sessionId;
         int pageSeq = 0;
         std::string cacheId;
         std::string eventId;
         
         pqxx:: work txn{C};
-        read_session(txn,sessionId,pageSeq,cacheId,eventId,/*time*/(long)arg);
+        read_session(txn,sessionId,pageSeq,cacheId,eventId,/*time*/arg);
         txn.commit();
 
         /*sleep for 1/10 (100000 us) of second*/
         usleep(100000);
         count++;
     }
-    return NULL;
 }
 

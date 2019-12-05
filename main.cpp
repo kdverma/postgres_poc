@@ -1,5 +1,6 @@
 #define _GLIBCXX_USE_CXX11_ABI 0
 #include <iostream>
+#include <thread>
 #include <pqxx/pqxx>
 #include "databaseConnection.h"
 #include "databaseAPI.h"
@@ -8,53 +9,36 @@ int main()
 {
     try
     {
-        pthread_t my_thread[5];
-        pthread_t my_thread_reader[5];
-        void *ret_join;
         long id;
+        std::vector<std::thread> writterThreads;
+        std::vector<std::thread> readerThreads;
         for(id = 1; id <= 5; id++) 
-        {
-            int ret =  pthread_create(&my_thread[id], NULL, &workerThreadInsert, (void*)id);
-            if(ret != 0) 
-            {
-                printf("Error: pthread_create() failed\n");
-                exit(EXIT_FAILURE);
-            }
+        {     
+            writterThreads.emplace_back(std::thread(workerThreadInsert,id));
         }
 
         for(id = 1; id <= 5; id++) 
-        {
-            int ret =  pthread_create(&my_thread_reader[id], NULL, &workerThreadRead, (void*)id);
-            if(ret != 0) 
-            {
-                printf("Error: pthread_create() failed\n");
-                exit(EXIT_FAILURE);
-            }
+        {     
+            readerThreads.emplace_back(std::thread(workerThreadRead,id));
         }
 
+        
         printf("Waiting for thread to finish...\n");
-        for(id = 1; id <= 5; id++) 
+        
+        for (auto& t : writterThreads)
         {
-            int ret = pthread_join(my_thread[id], &ret_join);
-            if(ret != 0) 
+            if(t.joinable()) 
             {
-                perror("pthread_join failed writter thread");
-                exit(EXIT_FAILURE);
+                t.join(); 
             }
-            printf("Thread joined for writter, it returned %s\n", (char *) ret_join);
-            //exit(EXIT_SUCCESS);
         }
 
-        for(id = 1; id <= 5; id++) 
+        for (auto& t : readerThreads)
         {
-            int ret = pthread_join(my_thread_reader[id], &ret_join);
-            if(ret != 0) 
+            if(t.joinable()) 
             {
-                perror("pthread_join failed for reader threads");
-                exit(EXIT_FAILURE);
+                t.join(); 
             }
-            printf("Thread joined for reader, it returned %s\n", (char *) ret_join);
-            //exit(EXIT_SUCCESS);
         }
     }
     catch (const std::exception &e)
