@@ -148,7 +148,7 @@ void workerThreadRead(int arg)
         txn.commit();
 
         /*sleep for 1/10 (100000 us) of second*/
-        usleep(100000);
+        usleep(10000);
         count++;
     }
 }
