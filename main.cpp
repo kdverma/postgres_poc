@@ -5,6 +5,8 @@
 #include "databaseConnection.h"
 #include "databaseAPI.h"
 
+#define MAX_THREADS 5
+
 int main()
 {
     try
@@ -12,32 +14,31 @@ int main()
         long id;
         std::vector<std::thread> writterThreads;
         std::vector<std::thread> readerThreads;
-        for(id = 1; id <= 5; id++) 
-        {     
-            writterThreads.emplace_back(std::thread(workerThreadInsert,id));
-        }
-
-        for(id = 1; id <= 5; id++) 
-        {     
-            readerThreads.emplace_back(std::thread(workerThreadRead,id));
-        }
-
-        
-        printf("Waiting for thread to finish...\n");
-        
-        for (auto& t : writterThreads)
+        for (id = 1; id <= MAX_THREADS; id++)
         {
-            if(t.joinable()) 
+            writterThreads.emplace_back(std::thread(workerThreadInsert, id));
+        }
+
+        for (id = 1; id <= MAX_THREADS; id++)
+        {
+            readerThreads.emplace_back(std::thread(workerThreadRead, id));
+        }
+
+        printf("Waiting for thread to finish...\n");
+
+        for (auto &t : writterThreads)
+        {
+            if (t.joinable())
             {
-                t.join(); 
+                t.join();
             }
         }
 
-        for (auto& t : readerThreads)
+        for (auto &t : readerThreads)
         {
-            if(t.joinable()) 
+            if (t.joinable())
             {
-                t.join(); 
+                t.join();
             }
         }
     }
