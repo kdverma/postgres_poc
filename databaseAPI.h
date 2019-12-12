@@ -76,7 +76,7 @@ void read_session(pqxx::transaction_base &txn, std::string sessionId, int pageSe
 void generateRandomData(std::string &sessionId, int &pageSeq, string &cacheId, string &eventId, int &timeStamp)
 {
     long int ns;
-    //uint64_t all;
+    ///uint64_t all;
     time_t sec;
     struct timespec spec;
 
