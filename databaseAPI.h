@@ -3,80 +3,39 @@
 #include <time.h>
 #include <stdio.h>
 #include <unistd.h>
-#include <stdlib.h> 
-#include <pthread.h> 
+#include <stdlib.h>
+#include <pthread.h>
 #include <stdint.h>
 #include <inttypes.h>
 #include <pqxx/pqxx>
+#include "binaryblob.h"
 using namespace std;
 using namespace pqxx;
 
-#define BILLION  1000000000L
+#define BILLION 1000000000L
+//#define RECORDS_PER_THREAD 3379392
+#define RECORDS_PER_THREAD 100
 
-struct sessionObject{
-    //pqxx::transaction_base txn;
-    std::string sessionId;
-    int pageSeq;
-    std::string cacheId;
-    std::string eventId;
-    int time;
-};
-
-pqxx::result get_all_sessions_data(pqxx::transaction_base &txn)
+void add_session(pqxx::transaction_base &txn, std::string &cacheId, int &resourceSize, int &resourceCreated, string &resourceHeader, string &resourceUrl)
 {
-  // Execute database query and immediately retrieve results.
-  return txn.exec("SELECT id, name, department FROM Employee");
+    void *bin_data = static_cast<void *>(rawDataOne);
+    size_t bin_size = 4425; // -- ...and the size of the binary data
+    pqxx::binarystring blob(bin_data, bin_size);
+
+    txn.exec("INSERT INTO cachedbtable(cache_id, resource_size, resource_created, resource_headers, resource_url, resource_data) "
+             "VALUES ( " +
+             txn.quote(cacheId) + ", " +
+             txn.quote(resourceSize) + ", " +
+             txn.quote(resourceCreated) + ", " +
+             txn.quote(resourceHeader) + ", " +
+             txn.quote(resourceUrl) + ", " +
+             txn.quote(blob) +
+             ")");
 }
 
-void add_session(pqxx::transaction_base &txn, std::string sessionId, int pageSeq, string cacheId, string eventId, int time)
-{
-  // Use quote() to escape and quote a value safely for use in a
-  // query.  Avoid bugs and security holes when strings contain
-  // backslashes, quotes, or other "weird" characters.
-  // That's not very useful for department (an integer), but it
-  // also represents the value as a string.  We don't want to add
-  // an int to the query, we want to add a string that represents
-  // the int value.
-
-    txn.exec(
-    "INSERT INTO sessiontable(session_id,page_sequence,cache_id,event_id,page_timestamp) "
-    "VALUES (" +
-    txn.quote(sessionId) + ", " +
-    txn.quote(pageSeq) + ", " +
-    txn.quote(cacheId) + ", " +
-    txn.quote(eventId) + ", " +
-    txn.quote(time) +
-    ")");
-}
-
-void read_session(pqxx::transaction_base &txn, std::string sessionId, int pageSeq, string cacheId, string eventId, int time)
-{
-    pqxx::result data = txn.exec("SELECT * FROM sessiontable ORDER BY session_id DESC limit 1");
-    std::cout << "Found " << data.size() << " entries :" << std::endl;
-    std::cout << "session_id\t\t\t" << "page_sequence\t\t\t" << "cache_id\t\t\t" << "event_id\t\t" << "page_timestamp\n";
-    std::cout << "===============================================================================================================================================\n\n";
-    for (auto row: data)
-    {
-        std::cout << row[0].c_str() <<"\t\t" << row[1].c_str() <<"\t\t\t"  << row[2].c_str() <<"\t\t" << row[3].c_str() <<"\t\t" << row[4].c_str() << std::endl;
-    }
-    /*for (auto row: data)
-    {
-        std::cout
-        << row["session_id"].as<std::string>() << "\t"
-        << row["page_sequence"].as<int>() << "\t"
-        << row["cache_id"].as<std::string>() << "\t"
-        << row["event_id"].as<std::string>() << "\t"
-        << row["page_timestamp"].as<int>() << std:endl
-        <<"==============================================================================="
-        << std::endl;
-    }*/
-
-}
-
-void generateRandomData(std::string &sessionId, int &pageSeq, string &cacheId, string &eventId, int &timeStamp)
+void generateRandomData(string &cacheId, int &resourceSize, int &resourceCreated, string &resourceHeader, string &resourceUrl, int &arg)
 {
     long int ns;
-    ///uint64_t all;
     time_t sec;
     struct timespec spec;
 
@@ -84,72 +43,115 @@ void generateRandomData(std::string &sessionId, int &pageSeq, string &cacheId, s
     sec = spec.tv_sec;
     ns = spec.tv_nsec;
 
-    uint64_t randomNum = (uint64_t) sec * BILLION + (uint64_t) ns;
+    uint64_t randomNum = (uint64_t)sec * BILLION + (uint64_t)ns;
 
-    //sessionId = "session_";
-    sessionId = "";
+    cacheId = "";
     std::ostringstream oss;
     oss << randomNum;
-    sessionId.append(oss.str());
-
-    pageSeq = randomNum%1000000;
-
-    cacheId = "cacheId_";
+    oss << "_" << arg;
     cacheId.append(oss.str());
 
-    eventId = "eventId_";
-    eventId.append(oss.str());
-
-    timeStamp = time(0);
+    resourceSize = 50;
+    resourceCreated = 50;
+    resourceHeader = "resourceHeader";
+    resourceUrl = "resourceURL";
 }
 
 void workerThreadInsert(int arg)
 {
-    cout << "worker thread " << arg << endl;
-    pqxx::connection C("dbname=sessiondatabase user=kapil");
-    std::cout << "Connected to " << C.dbname() << std::endl;
-    //pqxx:: work txn{C};
-    
-    int count = 0;
-    while(count < 50)
+    //cout << "worker thread " << arg << endl;
+    pqxx::connection C("dbname=cachedatabase user=postgres");
+    //std::cout << "writter thread " << arg << " Connected to " << C.dbname() << std::endl;
+    time_t startTime = time(0);
+    printf("writter thread [%d] started at [%d] for [%d] entries\n", arg, startTime, RECORDS_PER_THREAD);
+    try
     {
-        std::string sessionId;
-        int pageSeq;
-        std::string cacheId;
-        std::string eventId;
-        int time;
+        int count = 0;
+        while (count < RECORDS_PER_THREAD)
+        {
+            std::string cacheId;
+            int resourceSize;
+            int resourceCreated;
+            string resourceHeader;
+            string resourceUrl;
 
-        generateRandomData(sessionId,pageSeq,cacheId,eventId,time);
-        pqxx:: work txn{C};
-        add_session(txn,sessionId,pageSeq,cacheId,eventId,/*time*/arg);
-        txn.commit();
+            generateRandomData(cacheId, resourceSize, resourceCreated, resourceHeader, resourceUrl, arg);
+            pqxx::work txn{C};
+            add_session(txn, cacheId, resourceSize, resourceCreated, resourceHeader, resourceUrl);
+            txn.commit();
 
-        /*sleep for 1/10 (100000 us) of second*/
-        usleep(100000);
-        count++;
+            /*sleep for 1/10 (100000 us) of second*/
+            //usleep(100000);
+            count++;
+        }
+        time_t endTime = time(0);
+        printf("writter thread [%d] stopped at [%d] after inserting [%d] rows, time taken = [%d] seconds\n", arg, endTime, RECORDS_PER_THREAD, (endTime - startTime));
+    }
+    catch (const pqxx::sql_error &e)
+    {
+        std::cerr << "SQL error: " << e.what() << std::endl;
+        std::cerr << "Query was: " << e.query() << std::endl;
+        std::cerr << "thread number : " << arg << std::endl;
+    }
+    catch (const std::exception &e)
+    {
+        std::cout << "ERRRORRRRRRRRRRRRR" << endl;
+        std::cerr << e.what() << std::endl;
+        std::cerr << "thread number : " << arg << std::endl;
+    }
+    catch (...)
+    {
+        std::cout << "ERRRORRRRRRRRRRRRR" << endl;
+        std::cerr << "thread number : " << arg << std::endl;
     }
 }
 
 void workerThreadRead(int arg)
 {
-    pqxx::connection C("dbname=sessiondatabase user=kapil");
-
-    int count = 0;
-    while(count < 50)
+    pqxx::connection C("dbname=cachedatabase user=postgres");
+    //std::cout << "reader thread " << arg << " Connected to " << C.dbname() << std::endl;
+    time_t startTime = time(0);
+    printf("reader thread [%d] started at [%d] for [%d] entries\n", arg, startTime, RECORDS_PER_THREAD);
+    try
     {
-        cout << "\n\n\nworker thread read by thread : " << arg << endl;
-        std::string sessionId;
-        int pageSeq = 0;
-        std::string cacheId;
-        std::string eventId;
-        
-        pqxx:: work txn{C};
-        read_session(txn,sessionId,pageSeq,cacheId,eventId,/*time*/arg);
-        txn.commit();
+        int count = 0;
+        while (count < RECORDS_PER_THREAD)
+        {
+            std::string sessionId;
+            int pageSeq = 0;
+            std::string cacheId;
+            std::string eventId;
 
-        /*sleep for 1/10 (100000 us) of second*/
-        usleep(10000);
-        count++;
+            pqxx::work txn{C};
+            pqxx::result data = txn.exec("SELECT * FROM cachedbtable ORDER BY cache_id DESC limit 1");
+            if (data.size() != 1)
+            {
+                printf("thread [%d] Could not read data from from db [%s] ",arg, C.dbname());
+            }
+            txn.commit();
+
+            /*sleep for 1/10 (100000 us) of second*/
+            //usleep(10000);
+            count++;
+        }
+        time_t endTime = time(0);
+        printf("reader thread [%d] stopped at [%d] after %d times read operation, time taken = [%d] seconds\n", arg, endTime, count, (endTime - startTime));
+    }
+    catch (const pqxx::sql_error &e)
+    {
+        std::cerr << "SQL error: " << e.what() << std::endl;
+        std::cerr << "Query was: " << e.query() << std::endl;
+        std::cerr << "thread number : " << arg << std::endl;
+    }
+    catch (const std::exception &e)
+    {
+        std::cout << "ERRRORRRRRRRRRRRRR" << endl;
+        std::cerr << e.what() << std::endl;
+        std::cerr << "thread number : " << arg << std::endl;
+    }
+    catch (...)
+    {
+        std::cout << "ERRRORRRRRRRRRRRRR" << endl;
+        std::cerr << "thread number : " << arg << std::endl;
     }
 }
-
