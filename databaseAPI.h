@@ -13,8 +13,8 @@ using namespace std;
 using namespace pqxx;
 
 #define BILLION 1000000000L
-//#define RECORDS_PER_THREAD 3379392
-#define RECORDS_PER_THREAD 100
+#define RECORDS_PER_THREAD (3251041/12)
+//#define RECORDS_PER_THREAD 100
 
 void add_session(pqxx::transaction_base &txn, std::string &cacheId, int &resourceSize, int &resourceCreated, string &resourceHeader, string &resourceUrl)
 {
