@@ -5,7 +5,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <pthread.h>
-#include <stdint.h>
+#include <cstdint>
 #include <inttypes.h>
 #include <pqxx/pqxx>
 #include "binaryblob.h"
@@ -16,7 +16,7 @@ using namespace pqxx;
 #define RECORDS_PER_THREAD (3251041/12)
 //#define RECORDS_PER_THREAD 100
 
-void add_session(pqxx::transaction_base &txn, std::string &cacheId, int &resourceSize, int &resourceCreated, string &resourceHeader, string &resourceUrl)
+void add_session(pqxx::transaction_base &txn, std::string &cacheId, uint64_t &resourceSize, uint64_t &resourceCreated, string &resourceHeader, string &resourceUrl)
 {
     void *bin_data = static_cast<void *>(rawDataOne);
     size_t bin_size = 4425; // -- ...and the size of the binary data
@@ -33,7 +33,7 @@ void add_session(pqxx::transaction_base &txn, std::string &cacheId, int &resourc
              ")");
 }
 
-void generateRandomData(string &cacheId, int &resourceSize, int &resourceCreated, string &resourceHeader, string &resourceUrl, int &arg)
+void generateRandomData(string &cacheId, uint64_t &resourceSize, uint64_t &resourceCreated, string &resourceHeader, string &resourceUrl, int &arg)
 {
     long int ns;
     time_t sec;
@@ -51,10 +51,10 @@ void generateRandomData(string &cacheId, int &resourceSize, int &resourceCreated
     oss << "_" << arg;
     cacheId.append(oss.str());
 
-    resourceSize = 50;
-    resourceCreated = 50;
-    resourceHeader = "resourceHeader";
-    resourceUrl = "resourceURL";
+    resourceSize = randomNum;
+    resourceCreated = randomNum;
+    resourceHeader = cacheId;
+    resourceUrl = cacheId;
 }
 
 void workerThreadInsert(int arg)
@@ -70,8 +70,8 @@ void workerThreadInsert(int arg)
         while (count < RECORDS_PER_THREAD)
         {
             std::string cacheId;
-            int resourceSize;
-            int resourceCreated;
+            uint64_t resourceSize;
+            uint64_t resourceCreated;
             string resourceHeader;
             string resourceUrl;
 
@@ -126,7 +126,7 @@ void workerThreadRead(int arg)
             pqxx::result data = txn.exec("SELECT * FROM cachedbtable ORDER BY cache_id DESC limit 1");
             if (data.size() != 1)
             {
-                printf("thread [%d] Could not read data from from db [%s] ",arg, C.dbname());
+                printf("thread [%d] Could not read data from from db [%s] \n",arg, C.dbname());
             }
             txn.commit();
 
